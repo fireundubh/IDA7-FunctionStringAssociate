@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+# IDA Plugins
+Release\
+Release64\
+*.pLW
+*.P64
