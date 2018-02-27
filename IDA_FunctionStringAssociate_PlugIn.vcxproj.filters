@@ -10,16 +10,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="StdAfx.h" />
-    <ClInclude Include="..\..\Projects\IDA Pro Work\IDA_Support\SupportLib\Utility.h">
+    <ClInclude Include="$(IDASUPPORT)\Utility.h">
       <Filter>Misc</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Projects\IDA Pro Work\IDA_Support\IDA_WaitEx\WaitBoxEx.h">
+    <ClInclude Include="$(IDAWAITBOX)\WaitBoxEx.h">
       <Filter>Misc</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="..\..\Projects\IDA Pro Work\IDA_Support\SupportLib\Utility.cpp">
+    <ClCompile Include="$(IDASUPPORT)\Utility.cpp">
       <Filter>Misc</Filter>
     </ClCompile>
   </ItemGroup>
