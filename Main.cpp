@@ -34,7 +34,7 @@ static void processFunction(func_t* f);
 
 // === Data ===
 static ALIGN(16) STRC stringArray[MAX_LINE_STR_COUNT];
-static unsigned int commentCount = 0;
+static int64 commentCount = 0;
 
 // Main dialog
 static const char mainDialog[] =
@@ -89,8 +89,10 @@ bool idaapi IDAP_run(size_t arg)
 
 			// Iterate through all functions..            
 			const size_t functionCount = get_func_qty();
-			char buffer[32];
-			msg("Processing %s functions.\n", prettyNumberString(functionCount, buffer));
+			char count[32] = "";
+			snprintf(count, sizeof(count), "%zu", functionCount);
+
+			msg("Processing %s functions.\n", count);
 
 			refreshUI();
 
@@ -111,7 +113,11 @@ bool idaapi IDAP_run(size_t arg)
 			}
 
 			WaitBox::hide();
-			msg("Done, generated %s string comments in %s.\n", prettyNumberString(commentCount, buffer), timeString(getTimeStamp() - startTime));
+
+			char count2[32] = "";
+			snprintf(count2, sizeof(count2), "%lld", commentCount);
+
+			msg("Done, generated %s string comments in %s.\n", count2, timeString(getTimeStamp() - startTime));
 			msg("---------------------------------------------------------------------\n");
 			refresh_idaview_anyway();
 
@@ -125,15 +131,54 @@ bool idaapi IDAP_run(size_t arg)
 	}
 	CATCH();
 
-	return false;
+	return true;
 }
 
-static int __cdecl compare(const void* a, const void* b)
+// Remove whitespace & unprintable chars from the input string
+static void filterWhitespace(char* pstr)
 {
-	const auto sa = static_cast<const STRC *>(a);
-	const auto sb = static_cast<const STRC *>(b);
+	char* ps = pstr;
+	while (*ps)
+	{
+		// Replace unwanted chars with a space char
+		char c = *ps;
+		if ((c < ' ') || (c > '~'))
+			*ps = ' ';
+		ps++;
+	}
 
-	return sa->refs - sb->refs;
+	// Trim any starting space(s)
+	ps = pstr;
+	while (*ps)
+	{
+		if (*ps != ' ')
+			break;
+		memmove(ps, ps + 1, strlen(ps));
+	}
+
+	// Trim any trailing space
+	ps = (pstr + (strlen(pstr) - 1));
+	while (ps >= pstr)
+	{
+		if (*ps != ' ')
+			break;
+		*ps-- = 0;
+	}
+}
+
+// static int __cdecl compare(const void* a, const void* b)
+// {
+// 	const auto sa = static_cast<const STRC *>(a);
+// 	const auto sb = static_cast<const STRC *>(b);
+//
+// 	return sa->refs - sb->refs;
+// }
+
+static int __cdecl compare(const void *a, const void *b)
+{
+	STRC *sa = (STRC *)a;
+	STRC *sb = (STRC *)b;
+	return (sa->refs - sb->refs);
 }
 
 size_t getCharacterLength(int strtype, size_t byteCount)
@@ -168,21 +213,28 @@ static void processFunction(func_t* f)
 
 	qstring qBuf;
 
-	if (get_func_cmt(&qBuf, f, true) == -1 && get_func_cmt(&qBuf, f, false) == -1)
-		return;
-
-	const char* tempComment = qBuf.c_str();
-
-	// Ignore common auto-generated comments
-	if (strncmp(tempComment, "Microsoft VisualC ", SIZESTR("Microsoft VisualC ")) != 0)
+	if (get_func_cmt(&qBuf, f, true) == -1)
 	{
-		if (strstr(tempComment, "\ndoubtful name") == nullptr)
-			skip = true;
+		get_func_cmt(&qBuf, f, false);
 	}
+	
+	// Ignore common auto-generated comments
+	if (qBuf.size() > 0)
+	{
+		const auto tempComment = qBuf.extract();
 
-	// Clear buffer and free memory
-	qBuf.clear();
+		if (strncmp(tempComment, "Microsoft VisualC", SIZESTR("Microsoft VisualC")) != 0)
+		{
+			if (strstr(tempComment, "\ndoubtful name") == nullptr)
+			{
+				skip = true;
+			}
+		}
 
+		// Clear buffer and free memory
+		qfree(tempComment);
+	}
+	
 	// TODO: Add option to append to existing comments?
 
 	if (skip)
@@ -209,23 +261,21 @@ static void processFunction(func_t* f)
 		const int32 strtype = getStringType(xb.to);
 		const size_t len = get_max_strlit_length(xb.to, strtype, ALOPT_IGNHEADS);
 
-		if (getCharacterLength(strtype, len) <= static_cast<unsigned int>(MIN_STR_SIZE + 1))
+		if (getCharacterLength(get_str_type_code(strtype), len) <= static_cast<unsigned int>(MIN_STR_SIZE + 1))
 			continue;
 
 		// Will convert non-printable to characters to Pascal-style strings
-		get_strlit_contents(&qBuf, xb.to, len, strtype, reinterpret_cast<size_t*>(qBuf.length()), STRCONV_INCLLEN);
-
-		// Trim leading and trailing whitespace
-		qBuf.ltrim();
-		qBuf.rtrim();
+		get_strlit_contents(&qBuf, xb.to, len, strtype, reinterpret_cast<size_t*>(qBuf.size()), STRCONV_ESCAPE);
 
 		// Get string from buffer
-		const char* contents = qBuf.c_str();
+		const auto contents = qBuf.extract();
+
+		filterWhitespace(contents);
 
 		if (!contents)
 			continue;
 
-		// If it's not tiny continue
+		// If it's tiny, continue
 		if (strlen(contents) < MIN_STR_SIZE)
 			continue;
 
@@ -248,6 +298,8 @@ static void processFunction(func_t* f)
 
 		// Add it to the list
 		strcpy(stringArray[nStr].str, contents);
+		qfree(contents);
+
 		stringArray[nStr].refs = 1;
 		++nStr;
 
@@ -295,7 +347,6 @@ static void processFunction(func_t* f)
 	}
 
 	// Add/replace comment
-	//msg(EAFORMAT" %u\n", f->startEA, nStr);
 	set_func_cmt(f, "", true);
 	set_func_cmt(f, "", false);
 	set_func_cmt(f, comment, true);
