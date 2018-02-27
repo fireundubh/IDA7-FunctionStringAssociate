@@ -32,7 +32,12 @@
 *.app
 
 # IDA Plugins
-Release\
-Release64\
+Debug/
+Release/
+Release64/
+x64/
 *.pLW
 *.P64
+
+# VS
+.vs/
