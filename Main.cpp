@@ -297,7 +297,7 @@ static void processFunction(func_t* f)
 			continue;
 
 		// Add it to the list
-		strcpy(stringArray[nStr].str, contents);
+		strncpy(stringArray[nStr].str, contents, MAX_LABEL_STR);
 		qfree(contents);
 
 		stringArray[nStr].refs = 1;
