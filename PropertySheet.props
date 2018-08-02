@@ -15,8 +15,5 @@
     <BuildMacro Include="IDAWAITBOX">
       <Value>$(IDAWAITBOX)</Value>
     </BuildMacro>
-    <BuildMacro Include="QTDIR">
-      <Value>$(QTDIR)</Value>
-    </BuildMacro>
   </ItemGroup>
 </Project>
